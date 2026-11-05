@@ -5,8 +5,8 @@
   "sha256": "d48abd653a314ff6605b5ba8e4032c5546c0e7e12d29c08b73065f322c836540",
   "sizeBytes": 65169559,
   "sizeMb": "62.15",
-  "minAndroid": "",
+  "minAndroid": "7.0",
   "downloadUrl": "https://github.com/AbidHasanPiash/green-releases/releases/latest/download/Green-Gateway.apk",
   "changelog": "• Create orders, send them to courier and update their status from your phone\n• Accounting on the go: record income and expenses with receipt photos, approvals, cash, invoices and profit & loss\n• Record payments using your store's own payment methods\n• Instant new-order notifications\n• Much lighter on battery: the SMS gateway sleeps until there is a message to send\n• New signing key: if you have an older version installed, uninstall it once before installing this one",
-  "releasedAt": "2026-11-05T20:20:05Z"
+  "releasedAt": "2026-11-05T20:20:38Z"
 }
