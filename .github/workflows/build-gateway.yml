@@ -52,6 +52,11 @@ jobs:
           DEPLOY_KEY: ${{ secrets.MOBILE_DEPLOY_KEY }}
           FORCE: ${{ inputs.force }}
         run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::warning::MOBILE_DEPLOY_KEY is not set yet — nothing to build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
