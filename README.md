@@ -18,7 +18,7 @@ with its SHA-256 checksum. `latest.json` describes the newest one
 3. Open Green Gateway and sign in with your store account.
 
 Requires Android 7.0 or newer. A new version installs over the old one and
-keeps you signed in.
+keeps you signed in. (Builds from 0.3.3 on use a new signing key: if an older version is installed, uninstall it once first.)
 
 ## How releases are made
 

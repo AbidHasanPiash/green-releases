@@ -7,9 +7,14 @@ name: Build Green Gateway
 #   https://github.com/AbidHasanPiash/green-releases/releases/latest/download/Green-Gateway.apk
 #
 # The build runs here (public repo: free Actions minutes), reading the app's
-# source with a read-only deploy key. Secrets:
-#   MOBILE_DEPLOY_KEY     private half of a read-only deploy key on green-mobile
-#   GOOGLE_SERVICES_JSON  base64 of green-mobile/google-services.json (Firebase)
+# source with a read-only deploy key, and runs green-mobile's
+# scripts/release-gateway.sh — the same script used for releases from a Mac,
+# which refuses to publish an APK not signed with the release key
+# (green-mobile/release-cert.sha256). Secrets:
+#   MOBILE_DEPLOY_KEY          private half of a read-only deploy key on green-mobile
+#   GOOGLE_SERVICES_JSON       base64 of green-mobile/google-services.json (Firebase)
+#   ANDROID_KEYSTORE_B64       base64 of the release keystore
+#   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 #
 # Triggers are schedule + manual only — never pull_request — so nothing from
 # a fork can run with these secrets.
@@ -34,9 +39,6 @@ concurrency:
 env:
   SOURCE_REPO: git@github.com:AbidHasanPiash/green-mobile.git
   ASSET: Green-Gateway.apk
-  # Every published APK must carry this signing certificate — phones refuse
-  # an update signed with a different one.
-  EXPECTED_CERT_SHA256: fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
 
 jobs:
   check:
@@ -118,86 +120,28 @@ jobs:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
 
-      - name: Build APK
+      - name: Release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build, verify and publish
         working-directory: app
         env:
-          GRADLE_WORKERS: "4"
-        run: bash scripts/build-apk.sh green gateway
-
-      - name: Verify and describe the APK
-        id: apk
-        run: |
-          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
-          apk=$(ls app/dist/Green-Gateway-*.apk)
-          cp "$apk" "$ASSET"
-
-          cert=$("$BT/apksigner" verify --print-certs "$ASSET" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
-          if [ "$cert" != "$EXPECTED_CERT_SHA256" ]; then
-            echo "::error::APK is signed with $cert, expected $EXPECTED_CERT_SHA256 — phones would refuse the update."
-            exit 1
-          fi
-
-          badging=$("$BT/aapt2" dump badging "$ASSET")
-          version=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<<"$badging" | head -1)
-          code=$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<<"$badging" | head -1)
-          sdk=$(sed -n "s/^sdkVersion:'\([0-9]*\)'.*/\1/p" <<<"$badging")
-          declare -A ANDROID=([21]=5.0 [22]=5.1 [23]=6.0 [24]=7.0 [25]=7.1 [26]=8.0 [27]=8.1 [28]=9 [29]=10 [30]=11 [31]=12 [32]=12.1 [33]=13 [34]=14 [35]=15 [36]=16)
-          sha256=$(sha256sum "$ASSET" | cut -d' ' -f1)
-          size=$(stat -c %s "$ASSET")
-
-          {
-            echo "version=$version"
-            echo "code=$code"
-            echo "tag=v$version-b$code"
-          } >> "$GITHUB_OUTPUT"
-
-          jq -n \
-            --arg version "$version" --argjson versionCode "$code" \
-            --arg commit "${{ needs.check.outputs.sha }}" \
-            --arg sha256 "$sha256" --argjson sizeBytes "$size" \
-            --arg sizeMb "$(awk "BEGIN{printf \"%.2f\", $size/1048576}")" \
-            --arg minAndroid "${ANDROID[$sdk]:-$sdk}" \
-            --arg downloadUrl "https://github.com/${{ github.repository }}/releases/latest/download/$ASSET" \
-            --arg releasedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{version:$version, versionCode:$versionCode, commit:$commit, sha256:$sha256, sizeBytes:$sizeBytes, sizeMb:$sizeMb, minAndroid:$minAndroid, downloadUrl:$downloadUrl, releasedAt:$releasedAt}' \
-            > releases/latest.json
-          cat releases/latest.json
-
-      - name: Release notes
-        run: |
-          last=$(git -C releases show HEAD:latest.json 2>/dev/null | jq -r '.commit // ""' || true)
-          {
-            echo "**SHA-256:** \`$(jq -r .sha256 releases/latest.json)\`"
-            echo "**Size:** $(jq -r .sizeMb releases/latest.json) MB · **Android** $(jq -r .minAndroid releases/latest.json)+"
-            echo
-            echo "### Changes"
-            if [ -n "$last" ] && git -C app cat-file -e "$last" 2>/dev/null; then
-              git -C app log --no-merges --pretty='- %s' "$last..HEAD"
-            else
-              git -C app log --no-merges --pretty='- %s' -10
-            fi
-          } > notes.md
-          cat notes.md
-
-      - name: Publish release
-        env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.apk.outputs.tag }}
-          VERSION: ${{ steps.apk.outputs.version }}
-          CODE: ${{ steps.apk.outputs.code }}
+          RELEASES_REPO: ${{ github.repository }}
+          RELEASES_DIR: ${{ github.workspace }}/releases
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GRADLE_WORKERS: "4"
         run: |
-          if gh release view "$TAG" -R "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ASSET" releases/latest.json --clobber -R "${{ github.repository }}"
-          else
-            gh release create "$TAG" "$ASSET" releases/latest.json -R "${{ github.repository }}" \
-              --title "Green Gateway $VERSION (build $CODE)" --notes-file notes.md --latest
-          fi
+          git -C "$RELEASES_DIR" config user.name "github-actions[bot]"
+          git -C "$RELEASES_DIR" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash scripts/release-gateway.sh
 
-      - name: Record the released commit
-        working-directory: releases
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add latest.json
-          git commit -q -m "release: Green Gateway ${{ steps.apk.outputs.version }} (build ${{ steps.apk.outputs.code }})"
-          git push -q
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
