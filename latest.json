@@ -1,12 +1,12 @@
 {
-  "version": "0.3.3",
-  "versionCode": 113,
-  "commit": "f182d33f7f865a88b006d14372f59dd12fcb175b",
-  "sha256": "d48abd653a314ff6605b5ba8e4032c5546c0e7e12d29c08b73065f322c836540",
-  "sizeBytes": 65169559,
-  "sizeMb": "62.15",
+  "version": "0.3.5",
+  "versionCode": 119,
+  "commit": "24ff341afa12580fc3a30c22a8d92afd44144343",
+  "sha256": "a0fc964894ac58d56f72e8bf0e5607116a1eb041387b35b38aa1b80d9dd0d54d",
+  "sizeBytes": 65175299,
+  "sizeMb": "62.16",
   "minAndroid": "7.0",
   "downloadUrl": "https://github.com/AbidHasanPiash/green-releases/releases/latest/download/Green-Gateway.apk",
-  "changelog": "• Create orders, send them to courier and update their status from your phone\n• Accounting on the go: record income and expenses with receipt photos, approvals, cash, invoices and profit & loss\n• Record payments using your store's own payment methods\n• Instant new-order notifications\n• Much lighter on battery: the SMS gateway sleeps until there is a message to send\n• New signing key: if you have an older version installed, uninstall it once before installing this one",
-  "releasedAt": "2026-11-05T20:20:38Z"
+  "changelog": "• No more duplicate orders: if the connection drops while you create an order and you tap Create again, you get the same order back\n• Smoother, faster lists: orders and products scroll with less work, and product pictures are cached on the phone\n• If a screen fails it now shows a retry screen instead of closing the app\n• Phone numbers are matched however they are typed (017…, +88017…, 88017…), so a returning customer is found instead of added twice\n• Returned orders now have their own status (and filter), separate from cancelled ones\n• Confirm a returned parcel from the order screen: put it back in stock, or mark it damaged",
+  "releasedAt": "2026-11-11T19:01:10Z"
 }
